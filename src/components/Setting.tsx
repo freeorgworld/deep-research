@@ -92,13 +92,22 @@ function Setting({ open, onClose }: SettingProps) {
     }
   }
 
+  async function handleValueChange() {
+    const { update } = useSettingStore.getState();
+    update({
+      apiKey: form.getValues("apiKey"),
+      apiProxy: form.getValues("apiProxy"),
+      accessPassword: form.getValues("accessPassword"),
+    });
+  }
+
   useLayoutEffect(() => {
-    if (open) refresh();
-  }, [open, refresh]);
+    if (open && modelList.length === 0) refresh();
+  }, [open, modelList, refresh]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md print:hidden">
         <DialogHeader>
           <DialogTitle>{t("setting.title")}</DialogTitle>
           <DialogDescription>{t("setting.description")}</DialogDescription>
@@ -133,6 +142,7 @@ function Setting({ open, onClose }: SettingProps) {
                           type="password"
                           placeholder={t("setting.apiKeyPlaceholder")}
                           {...field}
+                          onBlur={() => handleValueChange()}
                         />
                       </FormControl>
                     </FormItem>
@@ -150,6 +160,7 @@ function Setting({ open, onClose }: SettingProps) {
                         <Input
                           placeholder="https://generativelanguage.googleapis.com"
                           {...field}
+                          onBlur={() => handleValueChange()}
                         />
                       </FormControl>
                     </FormItem>
@@ -171,6 +182,7 @@ function Setting({ open, onClose }: SettingProps) {
                           type="password"
                           placeholder={t("setting.accessPasswordPlaceholder")}
                           {...field}
+                          onBlur={() => handleValueChange()}
                         />
                       </FormControl>
                     </FormItem>
