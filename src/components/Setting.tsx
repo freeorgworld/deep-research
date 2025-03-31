@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,13 +25,19 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
+  SelectLabel,
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import useModel from "@/hooks/useModel";
 import { useSettingStore } from "@/store/setting";
+import {
+  filterThinkingModelList,
+  filterNetworkingModelList,
+} from "@/utils/models";
 import { cn } from "@/utils/style";
 import { omit, capitalize } from "radash";
 
@@ -49,6 +55,7 @@ const formSchema = z.object({
   thinkingModel: z.string(),
   networkingModel: z.string(),
   language: z.string().optional(),
+  theme: z.string().optional(),
 });
 
 function convertModelName(name: string) {
@@ -58,10 +65,18 @@ function convertModelName(name: string) {
     .join(" ");
 }
 
+let preLoading = false;
+
 function Setting({ open, onClose }: SettingProps) {
   const { t } = useTranslation();
   const { modelList, refresh } = useModel();
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const thinkingModelList = useMemo(() => {
+    return filterThinkingModelList(modelList);
+  }, [modelList]);
+  const networkingModelList = useMemo(() => {
+    return filterNetworkingModelList(modelList);
+  }, [modelList]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -83,14 +98,14 @@ function Setting({ open, onClose }: SettingProps) {
     onClose();
   }
 
-  async function fetchModelList() {
+  const fetchModelList = useCallback(async () => {
     try {
       setIsRefreshing(true);
       await refresh();
     } finally {
       setIsRefreshing(false);
     }
-  }
+  }, [refresh]);
 
   async function handleValueChange() {
     const { update } = useSettingStore.getState();
@@ -102,8 +117,11 @@ function Setting({ open, onClose }: SettingProps) {
   }
 
   useLayoutEffect(() => {
-    if (open && modelList.length === 0) refresh();
-  }, [open, modelList, refresh]);
+    if (open && !preLoading) {
+      fetchModelList();
+      preLoading = true;
+    }
+  }, [open, fetchModelList]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -114,7 +132,7 @@ function Setting({ open, onClose }: SettingProps) {
         </DialogHeader>
         <Form {...form}>
           <form className="space-y-4">
-            <Tabs defaultValue="local">
+            <Tabs defaultValue={form.getValues("apiKey") ? "local" : "server"}>
               <TabsList
                 className={cn("w-full mb-1", {
                   hidden: BUILD_MODE === "export",
@@ -211,13 +229,32 @@ function Setting({ open, onClose }: SettingProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="max-sm:max-h-72">
-                          {modelList.map((name) => {
-                            return (
-                              <SelectItem key={name} value={name}>
-                                {convertModelName(name)}
-                              </SelectItem>
-                            );
-                          })}
+                          {thinkingModelList[0].length > 0 ? (
+                            <SelectGroup>
+                              <SelectLabel>
+                                {t("setting.thinkingModels")}
+                              </SelectLabel>
+                              {thinkingModelList[0].map((name) => {
+                                return (
+                                  <SelectItem key={name} value={name}>
+                                    {convertModelName(name)}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectGroup>
+                          ) : null}
+                          <SelectGroup>
+                            <SelectLabel>
+                              {t("setting.nonThinkingModels")}
+                            </SelectLabel>
+                            {thinkingModelList[1].map((name) => {
+                              return (
+                                <SelectItem key={name} value={name}>
+                                  {convertModelName(name)}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                       <Button
@@ -258,13 +295,32 @@ function Setting({ open, onClose }: SettingProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="max-sm:max-h-72">
-                          {modelList.map((name) => {
-                            return (
-                              <SelectItem key={name} value={name}>
-                                {convertModelName(name)}
-                              </SelectItem>
-                            );
-                          })}
+                          {networkingModelList[0].length > 0 ? (
+                            <SelectGroup>
+                              <SelectLabel>
+                                {t("setting.networkingModels")}
+                              </SelectLabel>
+                              {networkingModelList[0].map((name) => {
+                                return (
+                                  <SelectItem key={name} value={name}>
+                                    {convertModelName(name)}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectGroup>
+                          ) : null}
+                          <SelectGroup>
+                            <SelectLabel>
+                              {t("setting.nonNetworkingModels")}
+                            </SelectLabel>
+                            {networkingModelList[1].map((name) => {
+                              return (
+                                <SelectItem key={name} value={name}>
+                                  {convertModelName(name)}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                       <Button
@@ -301,6 +357,33 @@ function Setting({ open, onClose }: SettingProps) {
                       <SelectContent className="max-sm:max-h-48">
                         <SelectItem value="en-US">English</SelectItem>
                         <SelectItem value="zh-CN">简体中文</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="theme"
+              render={({ field }) => (
+                <FormItem className="from-item">
+                  <FormLabel className="col-span-1">{t("theme")}</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-sm:max-h-48">
+                        <SelectItem value="system">
+                          {t("setting.system")}
+                        </SelectItem>
+                        <SelectItem value="light">
+                          {t("setting.light")}
+                        </SelectItem>
+                        <SelectItem value="dark">
+                          {t("setting.dark")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
