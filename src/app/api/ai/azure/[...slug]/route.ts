@@ -32,11 +32,12 @@ async function handler(req: NextRequest) {
     }
     let url = `${API_PROXY_BASE_URL}/${decodeURIComponent(path.join("/"))}`;
     if (params) url += `?${params}`;
+    console.log(url);
     const payload: RequestInit = {
       method: req.method,
       headers: {
         "Content-Type": req.headers.get("Content-Type") || "application/json",
-        Authorization: req.headers.get("Authorization") || "",
+        "api-key": req.headers.get("api-key") || "",
       },
     };
     if (body) payload.body = JSON.stringify(body);
